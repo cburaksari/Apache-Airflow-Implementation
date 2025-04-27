@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  spark-master:
+    image: bitnami/spark:3.5.0
+    container_name: spark-master
+    hostname: spark-master
+    environment:
+      - SPARK_MODE=master
+      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_MEMORY=2g
+    ports:
+      - "7077:7077"
+      - "8081:8081"
+    networks:
+      - spark-network
+
+  spark-worker:
+    image: bitnami/spark:3.5.0
+    container_name: spark-worker
+    hostname: spark-worker
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_MEMORY=2g
+      - SPARK_MASTER_URL=spark-master:7077
+    networks:
+      - spark-network
+
+  minio:
+    image: minio/minio
+    container_name: minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address :9001
+    networks:
+      - spark-network
+
+  airflow-scheduler:
+    image: apache/airflow:2.7.2
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=SequentialExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/airflow.db
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./plugins:/opt/airflow/plugins
+      - ./target:/opt/airflow/target
+      - airflow-db:/opt/airflow
+    entrypoint: ["bash", "-c", "airflow scheduler"]
+    depends_on:
+      - minio
+      - spark-master
+    networks:
+      - spark-network
+
+  airflow-webserver:
+    image: apache/airflow:2.7.2
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: airflow_webserver
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=SequentialExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/airflow.db
+      - AIRFLOW__WEBSERVER__AUTHENTICATE=False
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./plugins:/opt/airflow/plugins
+      - ./target:/opt/airflow/target
+      - airflow-db:/opt/airflow
+    entrypoint: ["bash", "-c", "airflow db init && airflow webserver"]
+    networks:
+      - spark-network
+    depends_on:
+      - spark-master
+      - minio
+
+volumes:
+  minio-data:
+  airflow-db:
+
+networks:
+  spark-network:
+    driver: bridge
