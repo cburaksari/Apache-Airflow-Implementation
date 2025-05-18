@@ -1,5 +1,3 @@
-Case Study
-
 Bu proje, Java içinde Apache Spark kullanarak Minio üzerinden yüklenen person ve country excellerine göre analiz gerçekleştiren ve sonucunda filtreleme gerçekleştiren bir uygulamayı içerir.
 Proje, kişisel verileri yaşlarına (30) ve kan gruplarına göre filtreler ve ülkelerle gruplar, ardından sonuçları minio depolama alanına kaydeder.
 
